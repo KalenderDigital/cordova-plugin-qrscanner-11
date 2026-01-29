@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import WebKit
 
 @objc(QRScanner)
 class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
@@ -204,7 +205,10 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
     @objc func makeOpaque(){
         self.webView?.isOpaque = true
         self.webView?.backgroundColor = UIColor.white
-        self.webView?.scrollView.backgroundColor = UIColor.white
+
+        if let wkWebView = self.webView as? WKWebView {
+            wkWebView.scrollView.backgroundColor = UIColor.white
+        }        
     }
 
     @objc func boolToNumberString(bool: Bool) -> String{
@@ -239,15 +243,19 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
 
     // This method processes metadataObjects captured by iOS.
     func metadataOutput(_ captureOutput: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-        if metadataObjects.count == 0 || scanning == false {
-            // while nothing is detected, or if scanning is false, do nothing.
+        if metadataObjects.isEmpty || scanning == false {
             return
         }
-        let found = metadataObjects[0] as! AVMetadataMachineReadableCodeObject
-        if found.type == AVMetadataObject.ObjectType.qr && found.stringValue != nil {
+
+        if let found = metadataObjects[0] as? AVMetadataMachineReadableCodeObject,
+           let stringValue = found.stringValue,
+           found.type == .qr {
+            
             scanning = false
-            let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: found.stringValue)
-            commandDelegate!.send(pluginResult, callbackId: nextScanningCommand?.callbackId!)
+            let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: stringValue)
+            if let command = nextScanningCommand {
+                commandDelegate!.send(pluginResult, callbackId: command.callbackId)
+            }
             nextScanningCommand = nil
         }
     }
@@ -298,7 +306,11 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
     @objc func show(_ command: CDVInvokedUrlCommand) {
         self.webView?.isOpaque = false
         self.webView?.backgroundColor = UIColor.clear
-        self.webView?.scrollView.backgroundColor = UIColor.clear
+
+        if let wkWebView = self.webView as? WKWebView {
+            wkWebView.scrollView.backgroundColor = UIColor.clear
+        }
+
         self.getStatus(command)
     }
 
